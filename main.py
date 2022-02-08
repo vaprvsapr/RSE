@@ -52,12 +52,37 @@ zero_coordinates = [EARTH_RADIUS * math.sin(zero_geo_coordinates[0]) *
 # Время отсчитываем в минутах, с начала времен. Т.е. с Рождества Христова.
 
 # Число дней в различные месяцы (есть погрешность)
+# Отсчет времени ведется с 00:00 1 января 2000 года.
 MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+YEAR_SUM = 365
+MONTH_0 = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+YEAR_SUM_0 = 366
 
-print("Введите период наблюдения в формате HH:MM:SS-DD:MM:YY через 'Enter'. Начало и конец.")
-begin_input = input().split('-')
-end_input = input().split('-')
+print("Введите период наблюдения в формате HH:MM:SS:DD:MM:YY через 'Enter'. Начало и конец.")
+begin_input = input().split(':')
+begin_days = int(begin_input[3])
 
+if begin_input[5] != 0:
+    for year in range(0, int(begin_input[5])):
+        if year % 4 == 0:
+            begin_days += YEAR_SUM_0
+        elif year % 4 != 0:
+            begin_days += YEAR_SUM
+
+if begin_input[4] != 0:
+    for month in range(0, int(begin_input[4])):
+        if begin_input[5] % 4 == 0:
+            begin_days += MONTH_0[month]
+        elif begin_input[5] % 4 != 0:
+            begin_days += MONTH_0
+
+print(begin_days)
+
+
+begin_time = begin_input[0] * 3600 + begin_input[1] * 60 + begin_input[2] + begin_input[3] * 3600 * 24
+
+
+# end_input = input().split(':')
 
 
 ax.scatter(laboratory_coordinates[0], laboratory_coordinates[1], laboratory_coordinates[2], c='r', marker='o')
