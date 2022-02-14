@@ -58,31 +58,37 @@ YEAR_SUM = 365
 MONTH_0 = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 YEAR_SUM_0 = 366
 
+def GetTime(inp):
+    days = int(inp[3])
+
+    if inp[5] != 0:
+        for year in range(0, int(inp[5])):
+            if year % 4 == 0:
+                days += YEAR_SUM_0
+            elif year % 4 != 0:
+                days += YEAR_SUM
+
+    if inp[4] != 0:
+        for month in range(0, int(inp[4]) - 1):
+            if int(inp[5]) % 4 == 0:
+                days += MONTH_0[month]
+            elif int(inp[5]) % 4 != 0:
+                days += MONTH_0[month]
+
+    time = int(inp[2]) + int(inp[1]) * 60 + int(inp[0]) * 3600 + int(days) * 24 * 3600
+    return time
+
+
 print("Введите период наблюдения в формате HH:MM:SS:DD:MM:YY через 'Enter'. Начало и конец.")
 begin_input = input().split(':')
-begin_days = int(begin_input[3])
+begin_time = GetTime(begin_input)
 
-if begin_input[5] != 0:
-    for year in range(0, int(begin_input[5])):
-        if year % 4 == 0:
-            begin_days += YEAR_SUM_0
-        elif year % 4 != 0:
-            begin_days += YEAR_SUM
+print(begin_time)
 
-if begin_input[4] != 0:
-    for month in range(0, int(begin_input[4])):
-        if begin_input[5] % 4 == 0:
-            begin_days += MONTH_0[month]
-        elif begin_input[5] % 4 != 0:
-            begin_days += MONTH_0
-
-print(begin_days)
+end_input = input().split(':')
+end_time = GetTime(end_input)
 
 
-begin_time = begin_input[0] * 3600 + begin_input[1] * 60 + begin_input[2] + begin_input[3] * 3600 * 24
-
-
-# end_input = input().split(':')
 
 
 ax.scatter(laboratory_coordinates[0], laboratory_coordinates[1], laboratory_coordinates[2], c='r', marker='o')
