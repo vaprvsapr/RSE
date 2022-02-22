@@ -1,13 +1,15 @@
 import matplotlib.pyplot as plt
 import math
+import numpy as np
 
 EARTH_RADIUS = 6371
 LIMITS = 15000
 Z_LIMIT = 12000
 EARTH_ROTATION_PER_SECOND = 2 * math.pi / 24 / 3600
-PARAM_A = 7000
+PARAM_A = 7228
 
 # setting matplotlib begin
+plt.figure(1)
 ax = plt.axes(projection="3d")
 ax.axes.set_xlim3d(left=-LIMITS, right=LIMITS)
 ax.axes.set_ylim3d(bottom=-LIMITS, top=LIMITS)
@@ -45,6 +47,16 @@ zero_coordinates = [EARTH_RADIUS * math.sin(zero_geo_coordinates[0]) *
 
 ax.scatter(zero_coordinates[0], zero_coordinates[1], zero_coordinates[2], c='g', marker='o')
 
+print("Введите геодезические координаты точки наблюдени.")
+laboratory_geo_coordinates = [(-float(input()) + 90) / 180 * math.pi, float(input()) / 180 * math.pi]
+laboratory_coordinates = [EARTH_RADIUS * math.sin(laboratory_geo_coordinates[0]) *
+                          math.cos(laboratory_geo_coordinates[1]),
+                          EARTH_RADIUS * math.sin(laboratory_geo_coordinates[0]) *
+                          math.sin(laboratory_geo_coordinates[1]),
+                          EARTH_RADIUS * math.cos(laboratory_geo_coordinates[0])]
+
+ax.scatter(laboratory_coordinates[0], laboratory_coordinates[1], laboratory_coordinates[2], c='r', marker='o')
+
 earth_coordinates = [[], [], []]
 n = 18
 for seconds in range(n):
@@ -56,23 +68,13 @@ for seconds in range(n):
         y_drawing_earth = EARTH_RADIUS * math.sin(theta) * math.sin(phi)
         z_drawing_earth = EARTH_RADIUS * math.cos(theta)
 
-        if [x_drawing_earth, y_drawing_earth, z_drawing_earth] != zero_coordinates:
+        if [x_drawing_earth, y_drawing_earth, z_drawing_earth] != zero_coordinates and \
+                [x_drawing_earth, y_drawing_earth, z_drawing_earth] != laboratory_coordinates:
             earth_coordinates[0].append(x_drawing_earth)
             earth_coordinates[1].append(y_drawing_earth)
             earth_coordinates[2].append(z_drawing_earth)
 
 ax.scatter(earth_coordinates[0], earth_coordinates[1], earth_coordinates[2], c='b', marker='x')
-
-print("Введите геодезические координаты точки наблюдени.")
-# Рисуем положение лаборатории
-laboratory_geo_coordinates = [(-float(input()) + 90) / 180 * math.pi, float(input()) / 180 * math.pi]
-laboratory_coordinates = [EARTH_RADIUS * math.sin(laboratory_geo_coordinates[0]) *
-                          math.cos(laboratory_geo_coordinates[1]),
-                          EARTH_RADIUS * math.sin(laboratory_geo_coordinates[0]) *
-                          math.sin(laboratory_geo_coordinates[1]),
-                          EARTH_RADIUS * math.cos(laboratory_geo_coordinates[0])]
-
-ax.scatter(laboratory_coordinates[0], laboratory_coordinates[1], laboratory_coordinates[2], c='r', marker='o')
 
 
 # Drawing Earth and laboratory end
@@ -136,7 +138,39 @@ def IsShipObservable(_laboratory_coordinates, _ship_coordinates):
         return False
 
 
+def AbsVec(vec):
+    return math.sqrt(vec[0] ** 2 + vec[1] ** 2 + vec[2] ** 2)
+
+
+def ScalarMultiplication(vec1, vec2):
+    return vec1[0] * vec2[0] + vec1[1] * vec2[1] + vec1[2] * vec2[2]
+
+
+def AngleBetweenTwoVectors(vec1, vec2):
+    cos_phi = ScalarMultiplication(vec1, vec2) / AbsVec(vec1) / AbsVec(vec2)
+    return math.acos(cos_phi)
+
+
+def Projection(a, b):
+    return [i * ScalarMultiplication(a, b) / AbsVec(b) / AbsVec(b) for i in b]
+
+
 # Some important functions end
+
+z = [0, 0, 1]
+angle_z_lab = AngleBetweenTwoVectors(z, laboratory_coordinates)
+Z = [0, 0, EARTH_RADIUS / math.cos(angle_z_lab)]
+Z_minus_lab = [-laboratory_coordinates[0], -laboratory_coordinates[1], Z[2] - laboratory_coordinates[2]]
+
+norm_norm = [(laboratory_coordinates[1] * z[2] - z[1] * laboratory_coordinates[2]),
+             -(laboratory_coordinates[0] * z[2] - z[0] * laboratory_coordinates[2]),
+             (laboratory_coordinates[0] * z[1] - z[0] * laboratory_coordinates[1])]
+
+
+def IsAbove(x, y, z):
+    return norm_norm[0] * (x - laboratory_coordinates[0]) + \
+           norm_norm[1] * (y - laboratory_coordinates[1]) + \
+           norm_norm[2] * (z - laboratory_coordinates[2])
 
 
 # Drawing ship trajectory begin
@@ -149,6 +183,8 @@ epoch_second_end = int(24 * 3600 * float(input()))
 
 x_ship_visible, y_ship_visible, z_ship_visible = [], [], []
 x_ship_invisible, y_ship_invisible, z_ship_invisible = [], [], []
+angle_ship_visible = []
+direction_ship_visible = []
 is_ship_observable = False
 
 for seconds in range(epoch_seconds, epoch_second_end):
@@ -162,32 +198,66 @@ for seconds in range(epoch_seconds, epoch_second_end):
         z_drawing_trajectory = GetZ(local_time)
 
         if IsShipObservable(laboratory_coordinates, [x_drawing_trajectory, y_drawing_trajectory, z_drawing_trajectory]):
-            if seconds % 10 == 0:
+            if seconds % 20 == 0:
                 x_ship_visible.append(x_drawing_trajectory)
                 y_ship_visible.append(y_drawing_trajectory)
                 z_ship_visible.append(z_drawing_trajectory)
 
+                ship_minus_lab = [x_drawing_trajectory - laboratory_coordinates[0],
+                                  y_drawing_trajectory - laboratory_coordinates[1],
+                                  z_drawing_trajectory - laboratory_coordinates[2]]
+                angle_ship_visible.append(
+                    AngleBetweenTwoVectors(ship_minus_lab, laboratory_coordinates) / math.pi * 180)
+
+                ship_proj_lab = Projection([x_drawing_trajectory, y_drawing_trajectory, z_drawing_trajectory],
+                                           laboratory_coordinates)
+                ship_proj_perp_lab = [x_drawing_trajectory - ship_proj_lab[0],
+                                      y_drawing_trajectory - ship_proj_lab[1],
+                                      z_drawing_trajectory - ship_proj_lab[2]]
+
+                if IsAbove(x_drawing_trajectory, y_drawing_trajectory, z_drawing_trajectory) < 0:
+                    direction_ship_visible.append(AngleBetweenTwoVectors(Z_minus_lab, ship_proj_perp_lab))
+                else:
+
+                    direction_ship_visible.append(2 * math.pi - AngleBetweenTwoVectors(Z_minus_lab, ship_proj_perp_lab))
+
+
             if not is_ship_observable:
                 is_ship_observable = True
-                print("Now ship is observable. Time:", int(seconds / 24 / 60 / 60),
-                      int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) / 3600),
-                      int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) -
-                          int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) / 3600) * 3600) / 60)
+                print("Now ship is observable.     Time:", int(seconds / 24 / 60 / 60),
+                      str(int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) / 3600)) + ":" +
+                      str(int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) -
+                              int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) / 3600) * 3600) / 60))
         else:
-            if seconds % 10 == 0:
+            if seconds % 30 == 0:
                 x_ship_invisible.append(x_drawing_trajectory)
                 y_ship_invisible.append(y_drawing_trajectory)
                 z_ship_invisible.append(z_drawing_trajectory)
 
             if is_ship_observable:
                 is_ship_observable = False
-                print("Now ship is not observable. Time:", int(seconds / 24 / 60 / 60),
-                      int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) / 3600),
-                      int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) -
-                          int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) / 3600) * 3600) / 60)
+                print("Now ship is not observable. Time:", int(seconds / 24 / 3600),
+                      str(int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) / 3600)) + ":" +
+                      str(int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) -
+                              int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) / 3600) * 3600) / 60))
 
 ax.scatter(x_ship_visible, y_ship_visible, z_ship_visible, c='g', marker=".")
 ax.scatter(x_ship_invisible, y_ship_invisible, z_ship_invisible, c='y', marker=".", s=1)
 # Drawing ship trajectory end
+
+
+# Creating plot begin
+
+
+for i in range(len(angle_ship_visible)):
+    print(angle_ship_visible[i], direction_ship_visible[i])
+
+plt.figure(2)
+
+pp = plt.subplot(111, projection='polar')
+
+pp.plot(direction_ship_visible, angle_ship_visible, marker='.', linestyle='None')
+pp.grid(True)
+# Creating plot end
 
 plt.show()
