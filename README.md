@@ -7,6 +7,6 @@ Though it is not working properly, it can help you to understand the basics of s
 The TLE.txt file is for two-line element set.
 
 The controls.txt file is for changing the initial parameters of the simulation. 
-First two lines are the latitude and longitude. The third - start time point. The fourth - end time point.
+First two lines are latitude and longitude. The third - start time point. The fourth - end time point.
 
-The result of the simulation will be a 3D plot of the Earth and ships relative position and the dependence of the elevation angle on the direction.
+The result of the simulation will be a 3D plot of the Earth and ship's relative position and the dependence of the elevation angle on the direction.
