@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import math
-import numpy as np
 
 EARTH_RADIUS = 6371
 LIMITS = 15000
@@ -23,21 +22,26 @@ with open("TLE.txt") as file:
 
 epoch_year = float(line_1[3][0:2])
 epoch = float(line_1[3][2:])
-
-inclination = float(line_2[2])
-right_ascension_of_the_ascending_node = float(line_2[3])
+inclination = float(line_2[2]) * math.pi / 180
+right_ascension_of_the_ascending_node = float(line_2[3]) * math.pi / 180
 eccentricity = float("0." + line_2[4])
-argument_of_perigee = float(line_2[5])
+argument_of_perigee = float(line_2[5]) * math.pi / 180
 mean_anomaly = float(line_2[6])
 mean_motion = float(line_2[7][0:11])
 revolution_number_at_epoch = float(line_2[7][11:-1])
 delta_anomaly_per_second = mean_motion * math.pi * 2 / 24 / 60 / 60
 # TLE reading end
-print(inclination, right_ascension_of_the_ascending_node,
-      eccentricity, argument_of_perigee, mean_anomaly,
-      mean_motion, revolution_number_at_epoch)
+
+# Controls reading begin
+with open("controls.txt") as file:
+    latitude = file.readline()
+    longitude = file.readline()
+    begin = file.readline()
+    end = file.readline()
+# Controls reading end
 
 # Drawing Earth and laboratory begin
+# Рисуем геодезический нуль
 zero_geo_coordinates = [math.pi / 2, 0]
 zero_coordinates = [EARTH_RADIUS * math.sin(zero_geo_coordinates[0]) *
                     math.cos(zero_geo_coordinates[1]),
@@ -47,8 +51,9 @@ zero_coordinates = [EARTH_RADIUS * math.sin(zero_geo_coordinates[0]) *
 
 ax.scatter(zero_coordinates[0], zero_coordinates[1], zero_coordinates[2], c='g', marker='o')
 
-print("Введите геодезические координаты точки наблюдени.")
-laboratory_geo_coordinates = [(-float(input()) + 90) / 180 * math.pi, float(input()) / 180 * math.pi]
+# Рисуем лабораторию
+laboratory_geo_coordinates = [(-float(latitude) + 90) / 180 * math.pi,
+                              float(longitude) / 180 * math.pi]
 laboratory_coordinates = [EARTH_RADIUS * math.sin(laboratory_geo_coordinates[0]) *
                           math.cos(laboratory_geo_coordinates[1]),
                           EARTH_RADIUS * math.sin(laboratory_geo_coordinates[0]) *
@@ -57,10 +62,11 @@ laboratory_coordinates = [EARTH_RADIUS * math.sin(laboratory_geo_coordinates[0])
 
 ax.scatter(laboratory_coordinates[0], laboratory_coordinates[1], laboratory_coordinates[2], c='r', marker='o')
 
+# Рисуем Землю
 earth_coordinates = [[], [], []]
 n = 18
-for seconds in range(n):
-    theta = math.pi / n * seconds
+for seconds_ in range(n):
+    theta = math.pi / n * seconds_
     for j in range(n):
         phi = 2 * math.pi / n * j
 
@@ -75,26 +81,26 @@ for seconds in range(n):
             earth_coordinates[2].append(z_drawing_earth)
 
 ax.scatter(earth_coordinates[0], earth_coordinates[1], earth_coordinates[2], c='b', marker='x')
-
-
 # Drawing Earth and laboratory end
 
+
 # Some important functions begin
-def GetX(true_anomaly):
+# Функции, возвращающие положение КА в зависимости от параматров орбиты
+def GetX(true_anomaly, right_ascension_of_the_ascending_node_local):
     p = PARAM_A * (1 - eccentricity * eccentricity)
     r = p / (1 + eccentricity * math.cos(true_anomaly))
     u = argument_of_perigee + true_anomaly
-    x_getting = r * (math.cos(right_ascension_of_the_ascending_node) * math.cos(u) -
-                     math.sin(right_ascension_of_the_ascending_node) * math.sin(u) * math.cos(inclination))
+    x_getting = r * (math.cos(right_ascension_of_the_ascending_node_local) * math.cos(u) -
+                     math.sin(right_ascension_of_the_ascending_node_local) * math.sin(u) * math.cos(inclination))
     return x_getting
 
 
-def GetY(true_anomaly):
+def GetY(true_anomaly, right_ascension_of_the_ascending_node_local):
     p = PARAM_A * (1 - eccentricity * eccentricity)
     r = p / (1 + eccentricity * math.cos(true_anomaly))
     u = argument_of_perigee + true_anomaly
-    y_getting = r * (math.sin(right_ascension_of_the_ascending_node) * math.cos(u) +
-                     math.cos(right_ascension_of_the_ascending_node) * math.sin(u) * math.cos(inclination))
+    y_getting = r * (math.sin(right_ascension_of_the_ascending_node_local) * math.cos(u) +
+                     math.cos(right_ascension_of_the_ascending_node_local) * math.sin(u) * math.cos(inclination))
     return y_getting
 
 
@@ -106,6 +112,7 @@ def GetZ(true_anomaly):
     return z_getting
 
 
+# Функция, отвечающая на вопрос: Виден ли в данный момент КА из лаборатории
 def IsShipObservable(_laboratory_coordinates, _ship_coordinates):
     lab_x = _laboratory_coordinates[0]
     lab_y = _laboratory_coordinates[1]
@@ -155,16 +162,14 @@ def Projection(a, b):
     return [i * ScalarMultiplication(a, b) / AbsVec(b) / AbsVec(b) for i in b]
 
 
-# Some important functions end
-
-z = [0, 0, 1]
-angle_z_lab = AngleBetweenTwoVectors(z, laboratory_coordinates)
+_z = [0, 0, 1]
+angle_z_lab = AngleBetweenTwoVectors(_z, laboratory_coordinates)
 Z = [0, 0, EARTH_RADIUS / math.cos(angle_z_lab)]
 Z_minus_lab = [-laboratory_coordinates[0], -laboratory_coordinates[1], Z[2] - laboratory_coordinates[2]]
 
-norm_norm = [(laboratory_coordinates[1] * z[2] - z[1] * laboratory_coordinates[2]),
-             -(laboratory_coordinates[0] * z[2] - z[0] * laboratory_coordinates[2]),
-             (laboratory_coordinates[0] * z[1] - z[0] * laboratory_coordinates[1])]
+norm_norm = [(laboratory_coordinates[1] * _z[2] - _z[1] * laboratory_coordinates[2]),
+             -(laboratory_coordinates[0] * _z[2] - _z[0] * laboratory_coordinates[2]),
+             (laboratory_coordinates[0] * _z[1] - _z[0] * laboratory_coordinates[1])]
 
 
 def IsAbove(x, y, z):
@@ -173,91 +178,136 @@ def IsAbove(x, y, z):
            norm_norm[2] * (z - laboratory_coordinates[2])
 
 
+def ParsePeriod(inp):
+    inp = inp.split(' ')
+    t1 = inp[0].split(':')
+    t2 = inp[1].split(':')
+    days = int(t2[0]) - 1
+    for m in range(0, int(t2[1])):
+        days += MONTHS[m]
+    sec = int(t1[0]) * 3600 + int(t1[1]) * 60 + int(t1[2]) + days * 24 * 3600
+    return sec
+# Some important functions end
+
+
 # Drawing ship trajectory begin
 epoch_seconds = int(24 * 3600 * epoch)
 
-print("Введите день в формате __._____ с 1 января 2022 года - начало")
-epoch_second_begin = int(24 * 3600 * float(input()))
-print("Введите день в формате __._____ с 1 января 2022 года - конец")
-epoch_second_end = int(24 * 3600 * float(input()))
+MONTHS = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
-x_ship_visible, y_ship_visible, z_ship_visible = [], [], []
-x_ship_invisible, y_ship_invisible, z_ship_invisible = [], [], []
-angle_ship_visible = []
-direction_ship_visible = []
-is_ship_observable = False
-
-for seconds in range(epoch_seconds, epoch_second_end):
-
-    right_ascension_of_the_ascending_node += EARTH_ROTATION_PER_SECOND
-
-    if seconds > epoch_second_begin:
-        local_time = delta_anomaly_per_second * seconds
-        x_drawing_trajectory = GetX(local_time)
-        y_drawing_trajectory = GetY(local_time)
-        z_drawing_trajectory = GetZ(local_time)
-
-        if IsShipObservable(laboratory_coordinates, [x_drawing_trajectory, y_drawing_trajectory, z_drawing_trajectory]):
-            if seconds % 20 == 0:
-                x_ship_visible.append(x_drawing_trajectory)
-                y_ship_visible.append(y_drawing_trajectory)
-                z_ship_visible.append(z_drawing_trajectory)
-
-                ship_minus_lab = [x_drawing_trajectory - laboratory_coordinates[0],
-                                  y_drawing_trajectory - laboratory_coordinates[1],
-                                  z_drawing_trajectory - laboratory_coordinates[2]]
-                angle_ship_visible.append(
-                    AngleBetweenTwoVectors(ship_minus_lab, laboratory_coordinates) / math.pi * 180)
-
-                ship_proj_lab = Projection([x_drawing_trajectory, y_drawing_trajectory, z_drawing_trajectory],
-                                           laboratory_coordinates)
-                ship_proj_perp_lab = [x_drawing_trajectory - ship_proj_lab[0],
-                                      y_drawing_trajectory - ship_proj_lab[1],
-                                      z_drawing_trajectory - ship_proj_lab[2]]
-
-                if IsAbove(x_drawing_trajectory, y_drawing_trajectory, z_drawing_trajectory) < 0:
-                    direction_ship_visible.append(AngleBetweenTwoVectors(Z_minus_lab, ship_proj_perp_lab))
-                else:
-
-                    direction_ship_visible.append(2 * math.pi - AngleBetweenTwoVectors(Z_minus_lab, ship_proj_perp_lab))
+# Временные промежутки достаём из файла controls.txt
+epoch_second_begin = ParsePeriod(begin)
+epoch_second_end = ParsePeriod(end)
 
 
-            if not is_ship_observable:
-                is_ship_observable = True
-                print("Now ship is observable.     Time:", int(seconds / 24 / 60 / 60),
-                      str(int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) / 3600)) + ":" +
-                      str(int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) -
-                              int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) / 3600) * 3600) / 60))
-        else:
-            if seconds % 30 == 0:
-                x_ship_invisible.append(x_drawing_trajectory)
-                y_ship_invisible.append(y_drawing_trajectory)
-                z_ship_invisible.append(z_drawing_trajectory)
+# Главная функия, рисующая траектории КА, и выводящая временные промежутки, когда КА наблюдается
+def Calculate():
+    # Создаем два массива для хранения координат КА. Один для видимых, другой для невидимых.
+    x_ship_visible, y_ship_visible, z_ship_visible = [], [], []
+    x_ship_invisible, y_ship_invisible, z_ship_invisible = [], [], []
+    angle_ship_visible = []
+    direction_ship_visible = []
+    is_ship_observable = False
+    right_ascension_of_the_ascending_node_local = right_ascension_of_the_ascending_node
 
-            if is_ship_observable:
-                is_ship_observable = False
-                print("Now ship is not observable. Time:", int(seconds / 24 / 3600),
-                      str(int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) / 3600)) + ":" +
-                      str(int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) -
-                              int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) / 3600) * 3600) / 60))
+    for seconds in range(epoch_seconds, epoch_second_end):
 
-ax.scatter(x_ship_visible, y_ship_visible, z_ship_visible, c='g', marker=".")
-ax.scatter(x_ship_invisible, y_ship_invisible, z_ship_invisible, c='y', marker=".", s=1)
-# Drawing ship trajectory end
+        right_ascension_of_the_ascending_node_local += EARTH_ROTATION_PER_SECOND
+
+        if seconds > epoch_second_begin:
+            local_time = delta_anomaly_per_second * seconds
+            x_drawing_trajectory = GetX(local_time, right_ascension_of_the_ascending_node_local)
+            y_drawing_trajectory = GetY(local_time, right_ascension_of_the_ascending_node_local)
+            z_drawing_trajectory = GetZ(local_time)
+
+            if IsShipObservable(laboratory_coordinates,
+                                [x_drawing_trajectory, y_drawing_trajectory, z_drawing_trajectory]):
+                if seconds % 20 == 0:
+                    x_ship_visible.append(x_drawing_trajectory)
+                    y_ship_visible.append(y_drawing_trajectory)
+                    z_ship_visible.append(z_drawing_trajectory)
+
+                    ship_minus_lab = [x_drawing_trajectory - laboratory_coordinates[0],
+                                      y_drawing_trajectory - laboratory_coordinates[1],
+                                      z_drawing_trajectory - laboratory_coordinates[2]]
+
+                    elevation = AngleBetweenTwoVectors(ship_minus_lab, laboratory_coordinates) / math.pi * 180
+                    angle_ship_visible.append(elevation)
+
+                    ship_proj_lab = Projection([x_drawing_trajectory, y_drawing_trajectory, z_drawing_trajectory],
+                                               laboratory_coordinates)
+                    ship_proj_perpendicular_lab = [x_drawing_trajectory - ship_proj_lab[0],
+                                                   y_drawing_trajectory - ship_proj_lab[1],
+                                                   z_drawing_trajectory - ship_proj_lab[2]]
+
+                    if IsAbove(x_drawing_trajectory, y_drawing_trajectory, z_drawing_trajectory) < 0:
+                        direction_ship_visible.append(AngleBetweenTwoVectors(Z_minus_lab, ship_proj_perpendicular_lab))
+                    else:
+                        direction_ship_visible.append(
+                            2 * math.pi - AngleBetweenTwoVectors(Z_minus_lab, ship_proj_perpendicular_lab))
+
+                if not is_ship_observable:
+                    is_ship_observable = True
+
+                    day = int(seconds / 24 / 60 / 60)
+                    hour = int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) / 3600)
+                    minute = int(int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) -
+                                     int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) / 3600) * 3600) / 60)
+                    second = seconds - day * 24 * 3600 - hour * 3600 - minute * 60
+                    print("Now ship is observable.     Time:", day, end=' ')
+                    if hour > 9:
+                        print(str(hour) + ":", end='')
+                    else:
+                        print("0" + str(hour) + ":", end='')
+                    if minute > 9:
+                        print(str(minute) + ":", end='')
+                    else:
+                        print("0" + str(minute) + ":", end='')
+                    if second > 9:
+                        print(str(second))
+                    else:
+                        print("0" + str(second))
+            else:
+                if seconds % 30 == 0:
+                    x_ship_invisible.append(x_drawing_trajectory)
+                    y_ship_invisible.append(y_drawing_trajectory)
+                    z_ship_invisible.append(z_drawing_trajectory)
+
+                if is_ship_observable:
+                    is_ship_observable = False
+
+                    day = int(seconds / 24 / 60 / 60)
+                    hour = int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) / 3600)
+                    minute = int(int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) -
+                                     int((seconds - int(seconds / 24 / 60 / 60) * 24 * 3600) / 3600) * 3600) / 60)
+                    second = seconds - day * 24 * 3600 - hour * 3600 - minute * 60
+                    print("Now ship is not observable. Time:", day, end=" ")
+                    if hour > 9:
+                        print(str(hour) + ":", end='')
+                    else:
+                        print("0" + str(hour) + ":", end='')
+                    if minute > 9:
+                        print(str(minute) + ":", end='')
+                    else:
+                        print("0" + str(minute) + ":", end='')
+                    if second > 9:
+                        print(str(second))
+                    else:
+                        print("0" + str(second))
+
+    ax.scatter(x_ship_visible, y_ship_visible, z_ship_visible, c='g', marker=".")
+    ax.scatter(x_ship_invisible, y_ship_invisible, z_ship_invisible, c='y', marker=".", s=1)
+
+    plt.suptitle("Satellite trajectory.")
+    plt.figure(2)
+    pp = plt.subplot(111, projection='polar')
+    pp.set_theta_zero_location('N')
+    pp.plot(direction_ship_visible, angle_ship_visible, marker='.', linestyle='None')
+    pp.grid(True)
 
 
-# Creating plot begin
+Calculate()
 
-
-for i in range(len(angle_ship_visible)):
-    print(angle_ship_visible[i], direction_ship_visible[i])
-
-plt.figure(2)
-
-pp = plt.subplot(111, projection='polar')
-
-pp.plot(direction_ship_visible, angle_ship_visible, marker='.', linestyle='None')
-pp.grid(True)
-# Creating plot end
-
+plt.title("Dependence of elevation angle on the direction.")
 plt.show()
+# Drawing ship trajectory end
